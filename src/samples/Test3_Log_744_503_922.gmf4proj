@@ -1,0 +1,90 @@
+{
+  "version": "1.0",
+  "name": "Unnamed Project",
+  "graphs": [
+    {
+      "id": "b5284bc8-69c8-463f-9ad1-08485d4afec8",
+      "title": "Proudy",
+      "channels": [
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterIdwSlave",
+          "group_index": 8,
+          "channel_index": 2,
+          "color": "#FF0000",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterIdwSlave"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterIqwSlave",
+          "group_index": 8,
+          "channel_index": 3,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterIqwSlave"
+        }
+      ],
+      "x_range": [
+        -6.899364729597229,
+        234.81397182259724
+      ],
+      "y_range": [
+        -189.8543033601842,
+        246.8543033601842
+      ],
+      "show_legend": true,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": ""
+    },
+    {
+      "id": "88aed344-7911-4026-8d05-adc5e887a0f8",
+      "title": "Napětí",
+      "channels": [
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterDCBusVoltageFeedback",
+          "group_index": 19,
+          "channel_index": 4,
+          "color": "#FF0000",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterDCBusVoltageFeedback"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "slaveDCBusVoltageFeedback",
+          "group_index": 21,
+          "channel_index": 4,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "slaveDCBusVoltageFeedback"
+        }
+      ],
+      "x_range": [
+        -6.825350440203162,
+        234.7533781342032
+      ],
+      "y_range": [
+        -105.99756627777097,
+        1889.8975662777711
+      ],
+      "show_legend": true,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": ""
+    }
+  ],
+  "mf4_files": [
+    "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+    "D:/I-30 Technicka_dokumentacia/R009-TAC1500/Skusky/Vector/Test3_Log_744_503_923.mf4"
+  ]
+}

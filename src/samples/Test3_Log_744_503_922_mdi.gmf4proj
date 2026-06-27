@@ -1,0 +1,226 @@
+{
+  "version": "1.0",
+  "name": "Unnamed Project",
+  "graphs": [
+    {
+      "id": "c8efdf11-0428-41b3-83ef-25178c94c40d",
+      "title": "Graph 1",
+      "channels": [
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterDCBusVoltageFeedback",
+          "group_index": 19,
+          "channel_index": 4,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterDCBusVoltageFeedback"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "slaveDCBusVoltageFeedback",
+          "group_index": 21,
+          "channel_index": 4,
+          "color": "#ff7f0e",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "slaveDCBusVoltageFeedback"
+        }
+      ],
+      "x_range": [
+        -10.107188494721003,
+        238.02086543072102
+      ],
+      "y_range": [
+        -111.13302829232616,
+        1895.0330282923262
+      ],
+      "show_legend": true,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": "",
+      "win_geometry": [
+        619,
+        470,
+        618,
+        469
+      ]
+    },
+    {
+      "id": "42878e9c-ecce-4247-9429-8da6b5f770a3",
+      "title": "Graph 2",
+      "channels": [
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterId",
+          "group_index": 27,
+          "channel_index": 4,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterId"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterIq",
+          "group_index": 27,
+          "channel_index": 3,
+          "color": "#ff7f0e",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterIq"
+        }
+      ],
+      "x_range": [
+        -10.107188494721003,
+        238.02086543072102
+      ],
+      "y_range": [
+        -219.906705316035,
+        280.7067053160349
+      ],
+      "show_legend": true,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": "",
+      "win_geometry": [
+        0,
+        470,
+        619,
+        469
+      ]
+    },
+    {
+      "id": "fd6bd0b2-720e-40d7-9b9e-e3073a380f88",
+      "title": "Graph 3",
+      "channels": [
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "slaveSpeed2",
+          "group_index": 40,
+          "channel_index": 3,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "slaveSpeed2"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterSpeed2",
+          "group_index": 28,
+          "channel_index": 3,
+          "color": "#ff7f0e",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterSpeed2"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterSpeed1",
+          "group_index": 28,
+          "channel_index": 4,
+          "color": "#2ca02c",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterSpeed1"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "slaveSpeed1",
+          "group_index": 40,
+          "channel_index": 4,
+          "color": "#d62728",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "slaveSpeed1"
+        }
+      ],
+      "x_range": [
+        -10.107188494721003,
+        238.02086543072102
+      ],
+      "y_range": [
+        -168.00116135775355,
+        2539.4011613577536
+      ],
+      "show_legend": true,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": "",
+      "win_geometry": [
+        619,
+        0,
+        618,
+        470
+      ]
+    },
+    {
+      "id": "355ac7e7-f5e4-484b-9eaf-028f4467c29c",
+      "title": "Graph 4",
+      "channels": [
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "torqueReq",
+          "group_index": 13,
+          "channel_index": 5,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "torqueReq"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "masterTorqueFeedback",
+          "group_index": 17,
+          "channel_index": 5,
+          "color": "#ff7f0e",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "masterTorqueFeedback"
+        },
+        {
+          "file_path": "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4",
+          "channel_name": "master_diag8_torqueReqRamp",
+          "group_index": 34,
+          "channel_index": 1,
+          "color": "#2ca02c",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "master_diag8_torqueReqRamp"
+        }
+      ],
+      "x_range": [
+        -10.107188494721003,
+        238.02086543072102
+      ],
+      "y_range": [
+        -2739.7408485075775,
+        2397.7408485075775
+      ],
+      "show_legend": true,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": "",
+      "win_geometry": [
+        0,
+        0,
+        619,
+        470
+      ]
+    }
+  ],
+  "mf4_files": [
+    "D:/SW/GIT/GraphMF4/src/samples/Test3_Log_744_503_922.mf4"
+  ]
+}
