@@ -1,10 +1,10 @@
-[build-system]
+﻿[build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "graphmf4"
-version = "0.1.0"
+version = "1.0.2"
 description = "Interactive MF4 signal viewer and grapher"
 readme = "README.md"
 requires-python = ">=3.10"
