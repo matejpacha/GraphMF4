@@ -1,113 +1,232 @@
-# GraphMF4
+Version 1.0.11
+🚀 New Features
 
-Interactive MF4 signal viewer for Windows 10/11.
 
-## Features
+Dockable Channel Panel
 
-- Load and parse MF4 / MDF4 files via [asammdf](https://github.com/danielhrisca/asammdf)
-- Browse all channels in a file with text filter
-- Select individual channels and add them to interactive graphs
-- Add multiple independent graph panels in one view
-- **Zoom** on both axes — mouse wheel or drag
-- **Pan** on both axes — middle-click drag or right-drag
-- Toggle **legend** visibility per graph
-- Per-channel: custom color, y-scale multiplier, y-offset, label
-- **Export** each graph to PNG / BMP / JPEG
-- **Save & load** project configuration (`.gmf4proj`) — stores file paths,
-  selected channels, view state (zoom/pan ranges), and legend visibility
+Added a dedicated channel management dock with support for:
 
-## Requirements
+Drag-and-drop channel reordering
+Visibility control
+Quick channel editing
+Digital channel stacking
+Direct signal drop support
 
-| | |
-|-|-|
-| OS | Windows 10 or 11 (64-bit) |
-| Python | ≥ 3.11 |
-| Libraries | See `requirements.txt` |
 
-## Quick start
+Panel visibility can be toggled from the View menu (Ctrl+Shift+P).
 
-```powershell
-# 1. Create and activate a virtual environment
-python -m venv .venv
-.venv\Scripts\activate
 
-# 2. Install dependencies
-pip install -r requirements.txt
 
-# 3. Run
-python src/main.py
+Signal Browser
 
-# (Optional) open a project directly
-python src/main.py path\to\project.gmf4proj
-```
+Added a dockable Signal Browser (Ctrl+Shift+B) for browsing all available signals across loaded MF4/MDF files.
+Supports:
 
-## Project file format
+File selection
+Signal filtering
+Double-click to add signals to the active graph
+Drag-and-drop of signals directly into graphs or channel panels
 
-Projects are saved as UTF-8 JSON with the `.gmf4proj` extension.
-See [`src/core/project.py`](src/core/project.py) for the full schema.
 
-```json
-{
-  "version": "1.0",
-  "name": "My Project",
-  "mf4_files": ["C:/data/recording.mf4"],
-  "graphs": [
-    {
-      "id": "...",
-      "title": "Engine",
-      "channels": [
-        {
-          "file_path": "C:/data/recording.mf4",
-          "channel_name": "Engine_RPM",
-          "color": "#1f77b4",
-          "y_scale": 1.0,
-          "y_offset": 0.0,
-          "label": "Engine RPM"
-        }
-      ],
-      "x_range": [0.0, 60.0],
-      "y_range": [0.0, 8000.0],
-      "show_legend": true
-    }
-  ]
-}
-```
 
-## Tech stack
 
-| Layer | Technology |
-|-------|------------|
-| Language | Python 3.11+ |
-| GUI | PySide6 (Qt 6) |
-| Interactive plots | pyqtgraph |
-| MF4 I/O | asammdf |
-| Numerics | NumPy |
 
-## Development
+Interactive Value Cursor
 
-```powershell
-pip install -r requirements-dev.txt
-pytest                  # run tests
-black src tests         # format
-ruff check src tests    # lint
-```
+Added a synchronized graph cursor displaying interpolated signal values at any time position.
+Cursor labels automatically avoid overlapping.
+Cursor position can be synchronized across multiple graphs.
 
-## Project structure
 
-```
-src/
-├── main.py                      Entry point
-├── core/
-│   ├── project.py               Data models + JSON serialization
-│   ├── mf4_reader.py            MF4 file I/O (asammdf wrapper)
-│   └── graph_model.py           Reserved for future graph-level logic
-├── ui/
-│   ├── main_window.py           Main window
-│   ├── graph_widget.py          Single graph panel widget
-│   └── signal_selector_dialog.py  Channel picker dialog
-└── utils/
-    └── export.py                Bitmap export
-tests/
-├── test_project.py
-└── test_mf4_reader.py
-```
+
+Delta Cursor (Δ Cursor)
+
+Added a second cursor for measuring time and signal differences.
+Displays:
+
+Δt (time difference)
+Per-channel ΔY values
+
+
+Synchronizes across graphs when X-axis synchronization is enabled.
+
+
+
+Optional Signal Labels
+
+New Labels toggle displays signal names directly on the graph.
+Labels automatically reposition during pan and zoom operations to remain readable.
+
+
+
+Dark Theme
+
+Added application-wide dark theme support (Ctrl+Shift+D).
+Includes matching plot backgrounds, axis styling, and MDI area appearance.
+Theme preference is remembered between sessions.
+
+
+
+Multi-Document Interface (MDI)
+
+Graphs now run inside movable and resizable MDI subwindows.
+Layout and window geometry are saved with the project.
+Added layout commands:
+
+Stack Vertically
+Tile
+Cascade
+
+
+
+
+
+Recent Projects
+
+Added a Recent Projects menu that stores and displays the last 10 opened projects.
+Missing project files are clearly marked.
+Includes a one-click Clear Recent option.
+
+
+
+MF4 File Replacement
+
+Added Replace MF4 File... functionality.
+Automatically remaps matching channels to a new data file while preserving graph layouts and settings.
+
+
+
+
+⚡ Performance Improvements
+
+
+Large File Loading
+
+MF4 file loading now runs in a background worker thread.
+Added progress indication for long-running operations.
+Improved application responsiveness during file loading.
+
+
+
+LTTB Downsampling
+
+Added Largest-Triangle-Three-Buckets (LTTB) downsampling.
+Configurable through Help → Settings.
+Helps maintain responsiveness when plotting large datasets.
+
+
+
+Rendering Optimizations
+
+Enabled clipToView for faster rendering of zoomed-in signals.
+Added pyqtgraph automatic peak-preserving downsampling.
+Increased LTTB output resolution to improve zoom detail.
+
+
+
+Optional OpenGL Rendering
+
+Added OpenGL rendering option in application settings.
+Can improve rendering performance on supported hardware.
+
+
+
+
+📊 Signal Visualization Enhancements
+
+
+Added support for Digital Signals:
+
+Step-wave rendering.
+Automatic lane stacking of multiple digital channels.
+Digital signal configuration from the channel editor.
+
+
+
+Added Ctrl + Left Mouse Drag rubber-band zoom.
+
+
+Improved graph interaction tooltips and usability.
+
+
+Added synchronized X-axis navigation across multiple graphs.
+
+
+
+🛠 Usability Improvements
+
+Added graph title renaming by double-clicking the title.
+Added busy cursor feedback during signal browsing operations.
+Added toolbar icons for common actions.
+Improved missing-file handling when opening projects:
+
+Missing MF4 files can be relocated using a dedicated dialog.
+Project references are automatically updated.
+
+
+
+
+🔧 Reliability & Stability
+
+
+Added comprehensive file-based logging to:
+
+Application startup
+MF4 loading
+Signal reading
+Plotting operations
+Unhandled exceptions
+
+
+
+Improved channel metadata loading:
+
+Channel enumeration no longer requires signal data decoding.
+Prevents channels from disappearing when data decoding fails.
+
+
+
+Added automatic signal lookup fallback:
+
+If channel group/index information becomes invalid, GraphMF4 can fall back to name-based signal resolution.
+
+
+
+Improved PyInstaller packaging support for CAN database decoding via canmatrix.
+
+
+Expanded support for both MDF 3.x and MDF 4.x files regardless of file extension.
+
+
+
+💾 Project & Workflow Improvements
+
+Graph layout, size, and position are now persisted within project files.
+Added synchronization of graph state before project save.
+Added Windows file association support for .gmf4proj project files.
+Enhanced project portability and missing-file recovery workflows.
+
+
+✅ Fixed
+
+Fixed cursor label auto-range feedback loop that could cause infinite scrolling and unstable graph behavior.
+Fixed several plotting and signal-loading edge cases by adding extensive exception handling and diagnostics.
+Improved channel loading reliability for corrupted or partially reprocessed MF4 files.
+Improved graph synchronization logic to prevent recursive update loops during cursor and X-axis synchronization.
+
+
+📦 Technical Highlights
+
+Dockable channel and signal browser panels
+Drag-and-drop signal management
+Synchronized cursors and X-axes
+Dark theme support
+MDI graph workspace
+LTTB downsampling
+OpenGL rendering option
+Digital signal visualization
+Recent projects management
+Enhanced logging and diagnostics
+MDF3/MDF4 compatibility improvements
+
+GraphMF4 continues to focus on providing a fast, responsive, and user-friendly environment for exploring and analyzing large MF4/MDF measurement datasets.
