@@ -1,3 +1,61 @@
+Version 1.0.16
+🚀 New Features
+
+
+Reload All Data (F5)
+
+Added File → Reload All Data (toolbar button ↺, shortcut F5).
+Re-opens the current project file from disk — identical to selecting it from Recent Projects.
+Resets all graph view ranges to fit the reloaded data.
+Displays a message if the project has not been saved yet.
+
+
+
+XY Chart Crosshair Cursor
+
+In X/Y mode the cursor is now a free crosshair (vertical + horizontal draggable lines).
+Displays "x = X.XXX" at the bottom of the chart and "y = Y.XXX" on the left.
+Shift + Left Click teleports the crosshair intersection to the clicked position.
+XY charts are excluded from cursor synchronization with other graphs.
+Delta cursor is disabled in XY mode (not meaningful on an XY plot).
+
+
+
+Channel List Multiselect & Context Menu
+
+Channel list now supports multi-selection (Ctrl/Shift+click).
+Right-click context menu on selected channels: Toggle Digital / Toggle Analog.
+
+
+
+Signal Browser Multiselect Drag-and-Drop
+
+Signal Browser now supports multi-selection (Ctrl/Shift+click).
+Dragging multiple selected signals adds all of them at once to the target graph.
++ Add to Active Graph button also adds all selected signals simultaneously.
+
+
+
+Labels State Persistence
+
+The Labels toggle state per graph is now saved to and restored from the project file.
+
+
+
+
+🛠 Usability Improvements
+
+Tile layout (View → Tile) now arranges graphs from top-left to bottom-right in a grid.
+
+
+⚡ Performance & Stability
+
+Fixed ghost cursor labels: a sweep mechanism removes any TextItem left in the Qt scene
+without a tracking reference, caused by a race condition between cursor and signal label updates.
+Fixed cursor label traces after rapid cursor movement: labels are now hidden immediately
+before being removed from the scene.
+
+
 Version 1.0.11
 🚀 New Features
 

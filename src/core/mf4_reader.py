@@ -139,7 +139,12 @@ class MF4Reader:
         group_index: Optional[int] = None,
         channel_index: Optional[int] = None,
     ) -> SignalData:
-        """Read timestamps and samples for a single channel."""
+        """Read timestamps and samples for a single channel.
+
+        First attempts to locate the channel by *group_index* + *channel_index*
+        (fast, unambiguous).  If that fails — e.g. the file was re-processed and
+        the group layout changed — retries by channel name alone as a fallback.
+        """
         mdf = self.load_file(path)
         kwargs: dict = {}
         if group_index is not None:
@@ -150,9 +155,21 @@ class MF4Reader:
         _log.debug("read_signal %s group=%s index=%s", channel_name, group_index, channel_index)
         try:
             sig = mdf.get(channel_name, **kwargs)
-        except Exception:
-            _log.exception("mdf.get failed for channel '%s'", channel_name)
-            raise
+        except Exception as primary_exc:
+            if kwargs:
+                # Retry without group/index — group layout may have changed
+                _log.warning(
+                    "read_signal '%s' group=%s index=%s failed (%s); retrying by name only",
+                    channel_name, group_index, channel_index, primary_exc,
+                )
+                try:
+                    sig = mdf.get(channel_name)
+                except Exception:
+                    _log.exception("mdf.get failed for channel '%s' (name-only fallback)", channel_name)
+                    raise
+            else:
+                _log.exception("mdf.get failed for channel '%s'", channel_name)
+                raise
         return SignalData(
             name=channel_name,
             timestamps=np.asarray(sig.timestamps, dtype=float),

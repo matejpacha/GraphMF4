@@ -8,7 +8,7 @@
 ; Output: installer\GraphMF4_Setup_1.0.0.exe  (~90-100 MB, lzma2 compressed)
 
 #define AppName      "GraphMF4"
-#define AppVersion   "1.0.13"
+#define AppVersion   "1.0.16"
 #define AppPublisher "GraphMF4"
 #define AppExe       "GraphMF4.exe"
 #define AppId        "{{6F3A2D85-C419-4B7E-A8D3-E5F1C2B94A70}"

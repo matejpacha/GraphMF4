@@ -8,11 +8,14 @@ Responsibilities:
 """
 from __future__ import annotations
 
+import json
+import logging
+import math
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QEvent, Qt, QSettings
-from PySide6.QtGui import QAction, QCloseEvent, QColor, QPalette
+from PySide6.QtCore import QEvent, Qt, QSettings, QSize
+from PySide6.QtGui import QAction, QBrush, QCloseEvent, QColor, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -21,7 +24,9 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMdiArea,
     QMdiSubWindow,
+    QMenu,
     QMessageBox,
+    QStyle,
     QProgressDialog,
     QPushButton,
     QSizePolicy,
@@ -34,7 +39,9 @@ from PySide6.QtWidgets import (
 
 from core.mf4_reader import MF4Reader
 from core.project import PROJECT_FILE_EXTENSION, GraphConfig, ProjectConfig
+from ui.channel_list_dock import ChannelListDock
 from ui.graph_widget import GraphWidget
+from ui.signal_list_dock import SignalListDock
 from ui.signal_selector_dialog import SignalSelectorDialog
 from ui.replace_file_dialog import ReplaceFileDialog
 
@@ -56,6 +63,12 @@ class MainWindow(QMainWindow):
         self._subwin_to_widget: dict = {}  # QMdiSubWindow -> GraphWidget
 
         self._setup_ui()
+        self._channel_dock = ChannelListDock(self)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._channel_dock)
+        self._signal_list_dock = SignalListDock(self._mf4_reader, self)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._signal_list_dock)
+        self._signal_list_dock.channel_requested.connect(self._on_signal_requested)
+        self._mdi_area.subWindowActivated.connect(self._on_subwindow_activated)
         self._setup_menu()
         self._setup_toolbar()
         self._restore_window_state()
@@ -74,6 +87,7 @@ class MainWindow(QMainWindow):
         self._mdi_area.setBackground(Qt.lightGray)
         self.setCentralWidget(self._mdi_area)
         self.setStatusBar(QStatusBar())
+        self.setAcceptDrops(True)   # receive channel drops from SignalListDock
 
     def _setup_menu(self) -> None:
         mb = self.menuBar()
@@ -81,21 +95,33 @@ class MainWindow(QMainWindow):
         # File -------------------------------------------------------
         file_menu = mb.addMenu("&File")
         file_menu.addAction(self._action("&New Project", self._new_project, "Ctrl+N"))
-        file_menu.addAction(self._action("&Open Project…", self._open_project, "Ctrl+O"))
+        file_menu.addAction(self._action("&Open Project\u2026", self._open_project, "Ctrl+O"))
+        self._recent_menu: QMenu = file_menu.addMenu("Recent &Projects")
+        self._build_recent_menu()
         file_menu.addSeparator()
         file_menu.addAction(self._action("&Save Project", self._save_project, "Ctrl+S"))
         file_menu.addAction(
             self._action("Save Project &As…", self._save_project_as, "Ctrl+Shift+S")
         )
         file_menu.addSeparator()
-        file_menu.addAction(self._action("Open MF4 &File\u2026", self._open_mf4_file, "Ctrl+F"))
-        file_menu.addAction(self._action("Re&place MF4 File\u2026", self._replace_mf4_file))
+        file_menu.addAction(self._action("Open Data &File\u2026", self._open_mf4_file, "Ctrl+F"))
+        file_menu.addAction(self._action("Re&place Data File\u2026", self._replace_mf4_file))
+        file_menu.addAction(self._action("&Reload All Data", self._reload_all_data, "F5"))
         file_menu.addSeparator()
         file_menu.addAction(self._action("E&xit", self.close, "Alt+F4"))
 
         # View -------------------------------------------------------
         view_menu = mb.addMenu("&View")
         view_menu.addAction(self._action("&Add Graph", self._add_graph, "Ctrl+G"))
+        view_menu.addSeparator()
+        _ch_panel_action = self._channel_dock.toggleViewAction()
+        _ch_panel_action.setText("&Channel Panel")
+        _ch_panel_action.setShortcut("Ctrl+Shift+P")
+        view_menu.addAction(_ch_panel_action)
+        _sig_list_action = self._signal_list_dock.toggleViewAction()
+        _sig_list_action.setText("&Signal Browser")
+        _sig_list_action.setShortcut("Ctrl+Shift+B")
+        view_menu.addAction(_sig_list_action)
         view_menu.addSeparator()
         self._sync_x_action = QAction("Sync &X-axes", self)
         self._sync_x_action.setCheckable(True)
@@ -121,31 +147,93 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self._dark_action)
         view_menu.addSeparator()
         view_menu.addAction(self._action("Stack &Vertically", self._arrange_vertical))
-        view_menu.addAction(self._action("&Tile", lambda: self._mdi_area.tileSubWindows()))
+        view_menu.addAction(self._action("&Tile", self._arrange_tile))
         view_menu.addAction(
             self._action("Cas&cade", lambda: self._mdi_area.cascadeSubWindows())
         )
 
         # Help -------------------------------------------------------
         help_menu = mb.addMenu("&Help")
+        help_menu.addAction(self._action("&Settings\u2026", self._show_settings))
+        help_menu.addSeparator()
         help_menu.addAction(self._action("&About", self._show_about))
 
     def _setup_toolbar(self) -> None:
         tb = QToolBar("Main Toolbar")
         tb.setMovable(False)
+        tb.setIconSize(QSize(20, 20))
+        tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.addToolBar(tb)
 
-        tb.addAction(self._action("New", self._new_project))
-        tb.addAction(self._action("Open", self._open_project))
-        tb.addAction(self._action("Save", self._save_project))
+        sp = QStyle.StandardPixmap
+        st = self.style()
+
+        new_act = self._action("New", self._new_project)
+        new_act.setIcon(st.standardIcon(sp.SP_FileIcon))
+        new_act.setToolTip("New Project (Ctrl+N)")
+        tb.addAction(new_act)
+
+        open_act = self._action("Open", self._open_project)
+        open_act.setIcon(st.standardIcon(sp.SP_DirOpenIcon))
+        open_act.setToolTip("Open Project (Ctrl+O)")
+        tb.addAction(open_act)
+
+        save_act = self._action("Save", self._save_project)
+        save_act.setIcon(st.standardIcon(sp.SP_DialogSaveButton))
+        save_act.setToolTip("Save Project (Ctrl+S)")
+        tb.addAction(save_act)
+
         tb.addSeparator()
-        tb.addAction(self._action("Open MF4", self._open_mf4_file))
-        tb.addAction(self._action("Replace MF4", self._replace_mf4_file))
-        tb.addAction(self._action("Add Graph", self._add_graph))
+
+        open_mf4_act = self._action("Open Data File", self._open_mf4_file)
+        open_mf4_act.setIcon(st.standardIcon(sp.SP_FileLinkIcon))
+        open_mf4_act.setToolTip("Open Data File (Ctrl+F)")
+        tb.addAction(open_mf4_act)
+
+        replace_act = self._action("Replace Data File", self._replace_mf4_file)
+        replace_act.setIcon(st.standardIcon(sp.SP_BrowserReload))
+        replace_act.setToolTip("Replace Data File")
+        tb.addAction(replace_act)
+
+        reload_act = self._action("Reload Data", self._reload_all_data)
+        reload_act.setIcon(self._make_icon("\u21ba", "#d62728"))
+        reload_act.setToolTip("Reload All Data from disk (F5)")
+        reload_act.setShortcut("F5")
+        tb.addAction(reload_act)
+
+        add_graph_act = self._action("Add Graph", self._add_graph)
+        add_graph_act.setIcon(self._make_icon("+", "#2ca02c"))
+        add_graph_act.setToolTip("Add Graph (Ctrl+G)")
+        tb.addAction(add_graph_act)
+
         tb.addSeparator()
+
+        self._sync_x_action.setIcon(self._make_icon("\u21c4", "#1f77b4"))
+        self._abs_time_action.setIcon(self._make_icon("\u23f1", "#9467bd"))
+        self._dark_action.setIcon(self._make_icon("\u25d1", "#555555"))
         tb.addAction(self._sync_x_action)
         tb.addAction(self._abs_time_action)
         tb.addAction(self._dark_action)
+
+    @staticmethod
+    def _make_icon(symbol: str, bg_color: str, size: int = 20) -> QIcon:
+        """Create a small round icon with *symbol* centred on a *bg_color* circle."""
+        from PySide6.QtGui import QFont
+        px = QPixmap(size, size)
+        px.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(px)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QBrush(QColor(bg_color)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(1, 1, size - 2, size - 2)
+        painter.setPen(QColor("white"))
+        font = QFont()
+        font.setBold(True)
+        font.setPixelSize(size - 7)
+        painter.setFont(font)
+        painter.drawText(px.rect(), Qt.AlignmentFlag.AlignCenter, symbol)
+        painter.end()
+        return QIcon(px)
 
     def _action(self, text: str, slot, shortcut: str = "") -> QAction:
         act = QAction(text, self)
@@ -166,6 +254,7 @@ class MainWindow(QMainWindow):
         self._project_path = None
         self._rebuild_graphs()
         self._set_dirty(False)
+        self._refresh_signal_list()
 
     def _open_project(self) -> None:
         if not self._confirm_discard():
@@ -221,6 +310,7 @@ class MainWindow(QMainWindow):
                 self._abs_time_action.blockSignals(False)
             # Mark dirty only when paths were actually changed by relocation
             self._set_dirty(bool(relocations))
+            self._add_to_recent(path)
             self.statusBar().showMessage(f"Loaded: {path}", 3000)
         except Exception as exc:
             QMessageBox.critical(self, "Error", f"Failed to open project:\n{exc}")
@@ -246,9 +336,60 @@ class MainWindow(QMainWindow):
             self._project.save(path)
             self._project_path = path
             self._set_dirty(False)
+            self._add_to_recent(path)
             self.statusBar().showMessage(f"Saved: {path}", 3000)
         except Exception as exc:
             QMessageBox.critical(self, "Error", f"Failed to save project:\n{exc}")
+
+    # ------------------------------------------------------------------
+    # Recent Projects
+    # ------------------------------------------------------------------
+
+    _RECENT_KEY = "recent_projects"
+    _RECENT_MAX = 10
+
+    def _load_recent(self) -> list[str]:
+        raw = QSettings("GraphMF4", "GraphMF4").value(self._RECENT_KEY, "[]")
+        try:
+            return [str(p) for p in json.loads(raw)]
+        except Exception:
+            return []
+
+    def _save_recent(self, paths: list[str]) -> None:
+        QSettings("GraphMF4", "GraphMF4").setValue(self._RECENT_KEY, json.dumps(paths))
+
+    def _add_to_recent(self, path: str | Path) -> None:
+        p = str(Path(path).resolve())
+        recent = [x for x in self._load_recent() if x != p]
+        recent.insert(0, p)
+        self._save_recent(recent[: self._RECENT_MAX])
+        self._build_recent_menu()
+
+    def _build_recent_menu(self) -> None:
+        self._recent_menu.clear()
+        recent = self._load_recent()
+        if not recent:
+            act = self._recent_menu.addAction("(no recent projects)")
+            act.setEnabled(False)
+            return
+        for path in recent:
+            p = Path(path)
+            exists = p.is_file()
+            label = p.name if exists else f"{p.name}  \u2717"
+            act = QAction(label, self)
+            act.setToolTip(path)
+            act.setStatusTip(path)
+            act.setEnabled(exists)
+            act.triggered.connect(lambda _checked, pp=path: self.open_project_from_path(pp))
+            self._recent_menu.addAction(act)
+        self._recent_menu.addSeparator()
+        clear_act = QAction("Clear Recent", self)
+        clear_act.triggered.connect(self._clear_recent)
+        self._recent_menu.addAction(clear_act)
+
+    def _clear_recent(self) -> None:
+        self._save_recent([])
+        self._build_recent_menu()
 
     # ------------------------------------------------------------------
     # MF4 file management
@@ -257,8 +398,8 @@ class MainWindow(QMainWindow):
     def _open_mf4_file(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Open MF4 File(s)",
-            filter="MF4 Files (*.mf4 *.MF4);;All Files (*)",
+            "Open Measurement File(s)",
+            filter="Measurement Files (*.mf4 *.MF4 *.mdf *.MDF);;All Files (*)",
         )
         for path in paths:
             if path not in self._project.mf4_files:
@@ -407,13 +548,14 @@ class MainWindow(QMainWindow):
             if path not in self._project.mf4_files:
                 self._project.mf4_files.append(path)
             self._set_dirty(True)
-            self.statusBar().showMessage(f"Loaded MF4: {name}", 3000)
+            self._refresh_signal_list()
+            self.statusBar().showMessage(f"Loaded Data File: {name}", 3000)
             progress.close()
             _cleanup()
 
         def on_error(msg: str, _path: str) -> None:
             progress.close()
-            QMessageBox.critical(self, "Error", f"Failed to open MF4 file:\n{msg}")
+            QMessageBox.critical(self, "Error", f"Failed to open Data File:\n{msg}")
             _cleanup()
 
         def _cleanup() -> None:
@@ -449,6 +591,12 @@ class MainWindow(QMainWindow):
         )
         widget.cursor_moved.connect(
             lambda x, w=widget: self._on_cursor_moved(w, x)
+        )
+        widget.delta_cursor_moved.connect(
+            lambda x, w=widget: self._on_delta_cursor_moved(w, x)
+        )
+        widget.channels_changed.connect(
+            lambda w=widget: self._on_channels_changed(w)
         )
 
         sub = QMdiSubWindow()
@@ -488,14 +636,16 @@ class MainWindow(QMainWindow):
             if sub:
                 self._subwin_to_widget.pop(sub, None)
                 sub.deleteLater()
+            if self._channel_dock._graph is widget:
+                self._channel_dock.set_graph(None)
             self._set_dirty(True)
 
     def _open_signal_selector(self, graph_widget: GraphWidget) -> None:
         if not self._project.mf4_files:
             QMessageBox.information(
                 self,
-                "No MF4 Files",
-                "Open an MF4 file first (File → Open MF4 File…).",
+                "No Data Files",
+                "Open a data file first (File → Open Data File…).",
             )
             return
         QApplication.setOverrideCursor(Qt.WaitCursor)
@@ -530,6 +680,13 @@ class MainWindow(QMainWindow):
         # Auto-arrange only when no window has saved geometry
         if not any(cfg.win_geometry for cfg in self._project.graphs):
             self._arrange_vertical()
+
+        # Dock doesn't receive subWindowActivated reliably during programmatic rebuild —
+        # explicitly point it at the first graph (or clear it when project is empty).
+        self._channel_dock.set_graph(
+            self._graph_widgets[0] if self._graph_widgets else None
+        )
+        self._refresh_signal_list()
 
     def _sync_configs_from_widgets(self) -> None:
         """Pull current view state (zoom, legend, MDI geometry) from each widget into the model."""
@@ -566,6 +723,55 @@ class MainWindow(QMainWindow):
             return True   # consumed — _remove_graph handles deletion via deleteLater
         return super().eventFilter(obj, event)
 
+    def dragEnterEvent(self, event) -> None:  # type: ignore[override]
+        from ui.signal_list_dock import CHANNEL_MIME_TYPE
+        if event.mimeData().hasFormat(CHANNEL_MIME_TYPE):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:  # type: ignore[override]
+        from ui.signal_list_dock import CHANNEL_MIME_TYPE, decode_channel_mime_multi
+        if event.mimeData().hasFormat(CHANNEL_MIME_TYPE):
+            results = decode_channel_mime_multi(event.mimeData())
+            if results:
+                # Walk up the widget hierarchy from the widget under the cursor
+                # to find a GraphWidget — works regardless of MDI coordinate quirks.
+                from PySide6.QtWidgets import QApplication
+                global_pos = self.mapToGlobal(event.position().toPoint())
+                widget_under = QApplication.widgetAt(global_pos)
+                target = None
+                w = widget_under
+                while w is not None:
+                    if isinstance(w, GraphWidget):
+                        target = w
+                        break
+                    w = w.parent()
+
+                # Fallbacks: last active graph → first graph → create new
+                if target is None:
+                    target = self._channel_dock._graph
+                if target is None:
+                    if not self._graph_widgets:
+                        self._add_graph()
+                    target = self._graph_widgets[0] if self._graph_widgets else None
+
+                if target is not None:
+                    from core.project import ChannelConfig
+                    for file_path, channel_name, group_index, channel_index in results:
+                        ch_cfg = ChannelConfig(
+                            file_path=file_path,
+                            channel_name=channel_name,
+                            group_index=group_index,
+                            channel_index=channel_index,
+                        )
+                        target.add_channel(ch_cfg)
+                    if self._channel_dock._graph is not target:
+                        self._channel_dock.set_graph(target)
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
+
     def _arrange_vertical(self) -> None:
         """Stack all subwindows in a single column filling the MDI area width."""
         subs = self._mdi_area.subWindowList()
@@ -578,6 +784,25 @@ class MainWindow(QMainWindow):
         for i, sub in enumerate(subs):
             sub.move(0, i * h)
             sub.resize(area_w, h)
+
+    def _arrange_tile(self) -> None:
+        """Tile all subwindows in a grid from top-left to bottom-right."""
+        subs = self._mdi_area.subWindowList()
+        if not subs:
+            return
+        n = len(subs)
+        vp = self._mdi_area.viewport()
+        area_w = vp.width()
+        area_h = vp.height()
+        cols = math.ceil(math.sqrt(n))
+        rows = math.ceil(n / cols)
+        w = area_w // cols
+        h = area_h // rows
+        for i, sub in enumerate(subs):
+            col = i % cols
+            row = i // cols
+            sub.move(col * w, row * h)
+            sub.resize(w, h)
 
     # ------------------------------------------------------------------
     # X-axis sync
@@ -609,6 +834,45 @@ class MainWindow(QMainWindow):
         finally:
             self._x_syncing = False
 
+    def _refresh_signal_list(self) -> None:
+        """Sync the Signal Browser dock with the current project's loaded files."""
+        self._signal_list_dock.set_files(self._project.mf4_files)
+
+    def _on_signal_requested(self, file_path: str, ch_info) -> None:
+        """Add *ch_info* from *file_path* to the currently active graph.
+
+        If no graph exists yet, one is created automatically.
+        """
+        from core.project import ChannelConfig
+        active = self._channel_dock._graph
+        if active is None:
+            if not self._graph_widgets:
+                self._add_graph()
+            active = self._graph_widgets[0] if self._graph_widgets else None
+        if active is None:
+            return
+        ch_cfg = ChannelConfig(
+            file_path=file_path,
+            channel_name=ch_info.name,
+            group_index=ch_info.group_index,
+            channel_index=ch_info.channel_index,
+        )
+        active.add_channel(ch_cfg)
+        # Dock may not be showing this graph yet (e.g. no MDI click occurred or a
+        # new graph was just created) — point it at the active graph explicitly.
+        if self._channel_dock._graph is not active:
+            self._channel_dock.set_graph(active)
+
+    def _on_subwindow_activated(self, sub) -> None:
+        """Update Channel Panel to show the newly active graph's channels."""
+        widget = self._subwin_to_widget.get(sub) if sub else None
+        self._channel_dock.set_graph(widget)
+
+    def _on_channels_changed(self, source: GraphWidget) -> None:
+        """Refresh Channel Panel when the active graph's channel list changes."""
+        if self._channel_dock._graph is source:
+            self._channel_dock.refresh()
+
     def _on_cursor_moved(self, source: GraphWidget, x: float) -> None:
         """Propagate cursor position from *source* to all other graphs with active cursors."""
         if not self._x_sync or self._cursor_syncing:
@@ -618,6 +882,18 @@ class MainWindow(QMainWindow):
             for w in self._graph_widgets:
                 if w is not source:
                     w.set_cursor_pos(x)
+        finally:
+            self._cursor_syncing = False
+
+    def _on_delta_cursor_moved(self, source: GraphWidget, x: float) -> None:
+        """Propagate delta cursor position from *source* to all other graphs with active delta cursors."""
+        if not self._x_sync or self._cursor_syncing:
+            return
+        self._cursor_syncing = True
+        try:
+            for w in self._graph_widgets:
+                if w is not source:
+                    w.set_delta_cursor_pos(x)
         finally:
             self._cursor_syncing = False
 
@@ -649,11 +925,33 @@ class MainWindow(QMainWindow):
         dirty_marker = " *" if self._dirty else ""
         self.setWindowTitle(f"GraphMF4 – {name}{dirty_marker}")
 
+    def _show_settings(self) -> None:
+        from ui.settings_dialog import SettingsDialog
+        dlg = SettingsDialog(parent=self)
+        if dlg.exec():
+            self._replot_all_graphs()
+
+    def _replot_all_graphs(self) -> None:
+        """Re-plot all channels in every graph (e.g. after settings change)."""
+        for widget in self._graph_widgets:
+            widget.replot_channels()
+
+    def _reload_all_data(self) -> None:
+        """Reload the current project from disk (same as opening it from Recent Projects)."""
+        if self._project_path is None:
+            QMessageBox.information(
+                self,
+                "Reload",
+                "Save the project first before reloading.",
+            )
+            return
+        self.open_project_from_path(str(self._project_path))
+
     def _show_about(self) -> None:
         QMessageBox.about(
             self,
             "About GraphMF4",
-            "<b>GraphMF4</b><br>Interactive MF4 signal viewer<br><br>"
+            "<b>GraphMF4</b><br>Interactive MF4/MDF signal viewer<br><br>"
             "Built with Python, PySide6, pyqtgraph, and asammdf.",
         )
 

@@ -115,6 +115,16 @@ class ChannelAppearanceDialog(QDialog):
         self._offset_spin.setToolTip("Offset added after scaling")
         form.addRow("Y offset:", self._offset_spin)
 
+        # Digital mode
+        self._digital_cb = QCheckBox("Digital signal (step rendering + auto-stack)")
+        self._digital_cb.setChecked(self._cfg.digital)
+        self._digital_cb.setToolTip(
+            "Render as a step waveform (square wave).\n"
+            "Use the 'Stack \u21d5' button in the graph header to automatically\n"
+            "place each digital channel in its own horizontal lane."
+        )
+        form.addRow("Mode:", self._digital_cb)
+
         layout.addLayout(form)
 
         # ---- formula hint ----
@@ -155,6 +165,7 @@ class ChannelAppearanceDialog(QDialog):
         self._cfg.visible = self._visible_cb.isChecked()
         self._cfg.y_scale = self._scale_spin.value()
         self._cfg.y_offset = self._offset_spin.value()
+        self._cfg.digital = self._digital_cb.isChecked()
         self.accept()
 
     # ------------------------------------------------------------------

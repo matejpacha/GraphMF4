@@ -147,7 +147,7 @@ class MissingFilesDialog(QDialog):
             self,
             f"Locate: {suggested}",
             start,
-            "MF4 Files (*.mf4 *.MF4);;All Files (*)",
+            "Measurement Files (*.mf4 *.MF4 *.mdf *.MDF);;All Files (*)",
         )
         if new_path:
             self._edits[old_path].setText(new_path)

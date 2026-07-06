@@ -36,6 +36,7 @@ class ChannelConfig:
     y_offset: float = 0.0
     visible: bool = True
     label: str = ""
+    digital: bool = False    # step rendering + auto-stack support
 
     def __post_init__(self) -> None:
         if not self.label:
@@ -52,11 +53,14 @@ class GraphConfig:
     x_range: Optional[list[float]] = None   # [x_min, x_max], None = auto-fit
     y_range: Optional[list[float]] = None   # [y_min, y_max], None = auto-fit
     show_legend: bool = True
+    show_labels: bool = False
     legend_position: str = "top-right"
     x_label: str = "Time [s]"
     y_label: str = ""
     win_geometry: Optional[list[int]] = None   # [x, y, width, height] in MDI coords
     x_axis_mode: str = "relative"              # "relative" | "absolute"
+    xy_mode: bool = False                      # True = plot Y channel(s) vs X channel
+    x_channel: Optional["ChannelConfig"] = None  # channel used as X axis in xy_mode
 
 
 @dataclass
@@ -80,8 +84,9 @@ class ProjectConfig:
         graphs = [
             GraphConfig(
                 **{
-                    **{k: v for k, v in g.items() if k != "channels"},
+                    **{k: v for k, v in g.items() if k not in ("channels", "x_channel")},
                     "channels": [ChannelConfig(**c) for c in g.get("channels", [])],
+                    "x_channel": ChannelConfig(**g["x_channel"]) if g.get("x_channel") else None,
                 }
             )
             for g in data.get("graphs", [])

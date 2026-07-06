@@ -13,6 +13,8 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
+from version import __version__
+
 
 def _resource_path(*parts: str) -> Path:
     """Resolve a resource path that works both in dev and in a PyInstaller bundle."""
@@ -45,7 +47,7 @@ def _setup_logging() -> None:
 
 def main() -> None:
     _setup_logging()
-    logging.info("GraphMF4 starting (Python %s, frozen=%s)", sys.version, getattr(sys, "frozen", False))
+    logging.info("GraphMF4 v%s starting (Python %s, frozen=%s)", __version__, sys.version, getattr(sys, "frozen", False))
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
@@ -60,6 +62,14 @@ def main() -> None:
         app.setWindowIcon(QIcon(str(icon_path)))
 
     from ui.main_window import MainWindow
+
+    # Apply OpenGL rendering mode before any PlotWidget is created.
+    # Must happen after QApplication exists (QSettings reads org/app from it).
+    import pyqtgraph as pg
+    from ui.settings_dialog import load_opengl_setting
+    if load_opengl_setting():
+        pg.setConfigOptions(useOpenGL=True)
+        logging.info("OpenGL rendering enabled")
 
     window = MainWindow()
     window.show()

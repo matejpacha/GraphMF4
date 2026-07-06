@@ -58,7 +58,7 @@ class ReplaceFileDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Replacement MF4 File",
-            filter="MF4 Files (*.mf4 *.MF4);;All Files (*)",
+            filter="Measurement Files (*.mf4 *.MF4 *.mdf *.MDF);;All Files (*)",
         )
         if path:
             self._new_edit.setText(path)

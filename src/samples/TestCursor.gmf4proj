@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "name": "Unnamed Project",
+  "graphs": [
+    {
+      "id": "731b4cc9-d688-4521-bc00-efe59be04e92",
+      "title": "Graph 1",
+      "channels": [
+        {
+          "file_path": "D:/I-30 Technicka_dokumentacia/R009-TAC1500/Skusky/Vector/Test3_Log_744_503_974.mf4",
+          "channel_name": "BTA_pozadProud",
+          "group_index": 8,
+          "channel_index": 3,
+          "color": "#1f77b4",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "BTA_pozadProud"
+        },
+        {
+          "file_path": "D:/I-30 Technicka_dokumentacia/R009-TAC1500/Skusky/Vector/Test3_Log_744_503_974.mf4",
+          "channel_name": "BTA_merenProud",
+          "group_index": 9,
+          "channel_index": 9,
+          "color": "#ff7f0e",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "BTA_merenProud"
+        },
+        {
+          "file_path": "D:/I-30 Technicka_dokumentacia/R009-TAC1500/Skusky/Vector/Test3_Log_744_503_974.mf4",
+          "channel_name": "BTA_povelChodu",
+          "group_index": 8,
+          "channel_index": 1,
+          "color": "#2ca02c",
+          "y_scale": 1.0,
+          "y_offset": 0.0,
+          "visible": true,
+          "label": "BTA_povelChodu"
+        }
+      ],
+      "x_range": [
+        -9.664354199750463,
+        418.4581298607505
+      ],
+      "y_range": [
+        -1.900569959481519,
+        51.900569959481516
+      ],
+      "show_legend": false,
+      "legend_position": "top-right",
+      "x_label": "Time [s]",
+      "y_label": "",
+      "win_geometry": [
+        0,
+        0,
+        1920,
+        943
+      ],
+      "x_axis_mode": "relative"
+    }
+  ],
+  "mf4_files": [
+    "D:/I-30 Technicka_dokumentacia/R009-TAC1500/Skusky/Vector/Test3_Log_744_503_974.mf4"
+  ]
+}
