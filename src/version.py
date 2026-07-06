@@ -4,4 +4,4 @@ This file is automatically updated by build.ps1 on every EXE build.
 """
 from __future__ import annotations
 
-__version__ = "1.0.12"
+__version__ = "1.0.13"
