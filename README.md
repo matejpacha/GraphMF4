@@ -1,4 +1,7 @@
 Version 1.0.16
+
+<img width="1280" height="694" alt="GraphMF4" src="https://github.com/user-attachments/assets/40ae9ade-3434-4dba-b631-1d533aefc527" />
+
 🚀 New Features
 
 
