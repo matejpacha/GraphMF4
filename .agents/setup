@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+step() {
+    local label="$1"
+    shift
+    local started=$SECONDS
+    printf '\n==> %s\n' "$label"
+    "$@"
+    printf '<== %s (%ss)\n' "$label" "$((SECONDS - started))"
+}
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+required_packages=(libxkbcommon-x11-0 libxcb-cursor0)
+missing_packages=()
+for package in "${required_packages[@]}"; do
+    if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null \
+        | grep -q 'install ok installed'; then
+        missing_packages+=("$package")
+    fi
+done
+
+if ((${#missing_packages[@]})); then
+    step "Refresh apt metadata" sudo apt-get update
+    step "Install Qt runtime libraries" sudo apt-get install -y "${missing_packages[@]}"
+else
+    printf 'Qt runtime libraries are already installed.\n'
+fi
+
+if [[ ! -x .venv/bin/python ]]; then
+    step "Create Python virtual environment" python3 -m venv .venv
+fi
+
+step "Install Python development dependencies" \
+    .venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+profile_marker="# graphmf4 orb virtual environment"
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+    cat >> "$HOME/.bash_profile" <<EOF
+
+$profile_marker
+if [[ "\${PWD}" == "$repo_root" && -f "$repo_root/.venv/bin/activate" ]]; then
+    source "$repo_root/.venv/bin/activate"
+fi
+EOF
+fi
+
+printf '\nGraphMF4 orb setup complete.\n'

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ ! -x "$repo_root/.venv/bin/python" ]]; then
+    printf 'GraphMF4 virtual environment is missing; rerun .agents/setup.\n' >&2
+    exit 1
+fi
+
+printf 'GraphMF4 virtual environment is ready.\n'
