@@ -14,8 +14,10 @@ import math
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QEvent, Qt, QSettings, QSize
+import pyqtgraph as pg
+from PySide6.QtCore import QEvent, QRect, QSettings, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QBrush, QCloseEvent, QColor, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -26,11 +28,11 @@ from PySide6.QtWidgets import (
     QMdiSubWindow,
     QMenu,
     QMessageBox,
-    QStyle,
     QProgressDialog,
     QPushButton,
     QSizePolicy,
     QStatusBar,
+    QStyle,
     QTextEdit,
     QToolBar,
     QVBoxLayout,
@@ -41,12 +43,14 @@ from core.mf4_reader import MF4Reader
 from core.project import PROJECT_FILE_EXTENSION, GraphConfig, ProjectConfig
 from ui.channel_list_dock import ChannelListDock
 from ui.graph_widget import GraphWidget
+from ui.replace_file_dialog import ReplaceFileDialog
 from ui.signal_list_dock import SignalListDock
 from ui.signal_selector_dialog import SignalSelectorDialog
-from ui.replace_file_dialog import ReplaceFileDialog
 
 
 class MainWindow(QMainWindow):
+    _SNAP_DISTANCE = 10
+
     def __init__(self) -> None:
         super().__init__()
         self._project: ProjectConfig = ProjectConfig()
@@ -61,6 +65,9 @@ class MainWindow(QMainWindow):
         self._active_threads: list = []   # keeps thread refs alive until done
         self._widget_to_subwin: dict = {}  # GraphWidget -> QMdiSubWindow
         self._subwin_to_widget: dict = {}  # QMdiSubWindow -> GraphWidget
+        self._subwindow_geometries: dict[QMdiSubWindow, QRect] = {}
+        self._snap_pending: set[QMdiSubWindow] = set()
+        self._applying_snap = False
 
         self._setup_ui()
         self._channel_dock = ChannelListDock(self)
@@ -88,6 +95,19 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._mdi_area)
         self.setStatusBar(QStatusBar())
         self.setAcceptDrops(True)   # receive channel drops from SignalListDock
+
+        # Qt may recreate a visible top-level native window when its first QOpenGLWidget
+        # is added. Keep an unobtrusive OpenGL child in the hierarchy from startup so
+        # creating the first graph cannot make the main window disappear and reappear.
+        self._opengl_surface_anchor: QOpenGLWidget | None = None
+        if pg.getConfigOption("useOpenGL"):
+            self._opengl_surface_anchor = QOpenGLWidget(self)
+            self._opengl_surface_anchor.setFixedSize(1, 1)
+            self._opengl_surface_anchor.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self._opengl_surface_anchor.setAttribute(
+                Qt.WidgetAttribute.WA_TransparentForMouseEvents
+            )
+            self._opengl_surface_anchor.lower()
 
     def _setup_menu(self) -> None:
         mb = self.menuBar()
@@ -604,6 +624,11 @@ class MainWindow(QMainWindow):
         sub.setWindowTitle(cfg.title)
         sub.setAttribute(Qt.WA_DeleteOnClose, False)  # we manage deletion
         sub.resize(700, 450)
+
+        # Register the relationship before addSubWindow() emits subWindowActivated,
+        # so the Channel Panel always follows the newly selected graph.
+        self._widget_to_subwin[widget] = sub
+        self._subwin_to_widget[sub] = widget
         self._mdi_area.addSubWindow(sub)
         sub.show()
 
@@ -613,8 +638,7 @@ class MainWindow(QMainWindow):
             sub.move(x, y)
             sub.resize(w, h)
 
-        self._widget_to_subwin[widget] = sub
-        self._subwin_to_widget[sub] = widget
+        self._subwindow_geometries[sub] = sub.geometry()
         sub.installEventFilter(self)
 
         # Apply current theme to the new widget
@@ -635,6 +659,8 @@ class MainWindow(QMainWindow):
             sub = self._widget_to_subwin.pop(widget, None)
             if sub:
                 self._subwin_to_widget.pop(sub, None)
+                self._subwindow_geometries.pop(sub, None)
+                self._snap_pending.discard(sub)
                 sub.deleteLater()
             if self._channel_dock._graph is widget:
                 self._channel_dock.set_graph(None)
@@ -716,12 +742,116 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def eventFilter(self, obj, event) -> bool:
-        """Intercept QMdiSubWindow close events so _remove_graph cleans up properly."""
+        """Handle graph-window closing and edge snapping."""
         widget = self._subwin_to_widget.get(obj)
-        if widget is not None and event.type() == QEvent.Type.Close:
-            self._remove_graph(widget)
-            return True   # consumed — _remove_graph handles deletion via deleteLater
+        if widget is not None:
+            if event.type() == QEvent.Type.Close:
+                self._remove_graph(widget)
+                return True   # consumed — _remove_graph handles deletion via deleteLater
+            if (
+                event.type() in (QEvent.Type.Move, QEvent.Type.Resize)
+                and not self._applying_snap
+                and obj not in self._snap_pending
+            ):
+                self._snap_pending.add(obj)
+                QTimer.singleShot(0, lambda sub=obj: self._apply_subwindow_snap(sub))
         return super().eventFilter(obj, event)
+
+    def _apply_subwindow_snap(self, sub: QMdiSubWindow) -> None:
+        """Snap a completed MDI geometry update to nearby edges."""
+        self._snap_pending.discard(sub)
+        if sub not in self._subwin_to_widget:
+            return
+
+        current = sub.geometry()
+        previous = self._subwindow_geometries.get(sub, current)
+        if (
+            sub.isMinimized()
+            or sub.isMaximized()
+            or QApplication.keyboardModifiers() & Qt.KeyboardModifier.AltModifier
+        ):
+            self._subwindow_geometries[sub] = current
+            return
+
+        snapped = self._snapped_subwindow_geometry(sub, previous, current)
+        if snapped != current:
+            self._applying_snap = True
+            try:
+                sub.setGeometry(snapped)
+            finally:
+                self._applying_snap = False
+        self._subwindow_geometries[sub] = sub.geometry()
+
+    def _snapped_subwindow_geometry(
+        self,
+        sub: QMdiSubWindow,
+        previous: QRect,
+        current: QRect,
+    ) -> QRect:
+        """Return geometry aligned to nearby workspace or graph-window edges."""
+        distance = self._SNAP_DISTANCE
+        x, y, width, height = (
+            current.x(),
+            current.y(),
+            current.width(),
+            current.height(),
+        )
+        right = x + width
+        bottom = y + height
+
+        viewport = self._mdi_area.viewport().rect()
+        x_targets = [0, viewport.width()]
+        y_targets = [0, viewport.height()]
+        for other in self._mdi_area.subWindowList():
+            if other is sub or not other.isVisible() or other.isMinimized():
+                continue
+            other_rect = other.geometry()
+            other_right = other_rect.x() + other_rect.width()
+            other_bottom = other_rect.y() + other_rect.height()
+            if y <= other_bottom + distance and bottom >= other_rect.y() - distance:
+                x_targets.extend((other_rect.x(), other_right))
+            if x <= other_right + distance and right >= other_rect.x() - distance:
+                y_targets.extend((other_rect.y(), other_bottom))
+
+        def nearest_adjustment(edges: tuple[int, ...], targets: list[int]) -> int:
+            adjustments = [target - edge for edge in edges for target in targets]
+            adjustment = min(adjustments, key=abs)
+            return adjustment if abs(adjustment) <= distance else 0
+
+        previous_right = previous.x() + previous.width()
+        previous_bottom = previous.y() + previous.height()
+
+        if width == previous.width() and x != previous.x():
+            x += nearest_adjustment((x, right), x_targets)
+        elif width != previous.width():
+            left_changed = x != previous.x()
+            right_changed = right != previous_right
+            if left_changed and not right_changed:
+                adjustment = nearest_adjustment((x,), x_targets)
+                if width - adjustment >= sub.minimumSizeHint().width():
+                    x += adjustment
+                    width -= adjustment
+            elif right_changed and not left_changed:
+                adjustment = nearest_adjustment((right,), x_targets)
+                if width + adjustment >= sub.minimumSizeHint().width():
+                    width += adjustment
+
+        if height == previous.height() and y != previous.y():
+            y += nearest_adjustment((y, bottom), y_targets)
+        elif height != previous.height():
+            top_changed = y != previous.y()
+            bottom_changed = bottom != previous_bottom
+            if top_changed and not bottom_changed:
+                adjustment = nearest_adjustment((y,), y_targets)
+                if height - adjustment >= sub.minimumSizeHint().height():
+                    y += adjustment
+                    height -= adjustment
+            elif bottom_changed and not top_changed:
+                adjustment = nearest_adjustment((bottom,), y_targets)
+                if height + adjustment >= sub.minimumSizeHint().height():
+                    height += adjustment
+
+        return QRect(x, y, width, height)
 
     def dragEnterEvent(self, event) -> None:  # type: ignore[override]
         from ui.signal_list_dock import CHANNEL_MIME_TYPE

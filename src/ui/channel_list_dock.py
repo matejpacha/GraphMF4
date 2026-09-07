@@ -264,10 +264,15 @@ class ChannelListDock(QDockWidget):
             "Převést na analogový" if all_digital else "Převést na digitální"
         )
         act_toggle = menu.addAction(toggle_label)
+        menu.addSeparator()
+        act_remove = menu.addAction("Odstranit z grafu")
 
         action = menu.exec(self._list.viewport().mapToGlobal(pos))
         if action is act_toggle:
             self._toggle_digital(selected_cfgs, not all_digital)
+        elif action is act_remove:
+            for ch_cfg in selected_cfgs:
+                self._graph._remove_channel(ch_cfg)
 
     def _toggle_digital(self, cfgs: list[ChannelConfig], digital: bool) -> None:
         """Set the digital flag on *cfgs* and replot."""
