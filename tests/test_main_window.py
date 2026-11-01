@@ -8,9 +8,9 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pyqtgraph as pg
+import pytest
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
-from PySide6.QtWidgets import QListWidgetItem
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -18,6 +18,7 @@ from core.mf4_reader import ChannelInfo
 from core.project import ChannelConfig
 from ui import channel_list_dock
 from ui.main_window import MainWindow
+from version import __version__
 
 
 def test_opengl_surface_is_present_before_first_graph(qtbot):
@@ -33,7 +34,45 @@ def test_opengl_surface_is_present_before_first_graph(qtbot):
         pg.setConfigOption("useOpenGL", previous)
 
 
-def test_double_click_adds_signal_to_selected_graph(qtbot):
+def test_window_title_contains_application_version(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    assert window.windowTitle() == f"GraphMF4 v{__version__} – Unnamed Project"
+
+    window._set_dirty(True)
+    assert window.windowTitle() == f"GraphMF4 v{__version__} – Unnamed Project *"
+    window._dirty = False
+
+
+def test_signal_browser_grouping_and_filter(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    dock = window._signal_list_dock
+    dock._all_channels = [
+        ChannelInfo("Speed", 0, 1, "km/h", "", "EngineStatus", "Engine ECU"),
+        ChannelInfo("RPM", 0, 2, "rpm", "", "EngineStatus", "Engine ECU"),
+        ChannelInfo("Voltage", 1, 1, "V", ""),
+    ]
+    dock._group_combo.setCurrentIndex(1)
+    tree = dock._list
+    assert tree.topLevelItemCount() == 2
+    assert tree.topLevelItem(0).text(0) == "EngineStatus"
+    assert tree.topLevelItem(0).childCount() == 2
+    assert tree.topLevelItem(1).text(0) == "Ostatní"
+    dock._filter_edit.setText("speed")
+    assert tree.topLevelItemCount() == 1
+    assert tree.topLevelItem(0).childCount() == 1
+    assert tree.topLevelItem(0).child(0).text(0) == "Speed  [km/h]"
+    dock._group_combo.setCurrentIndex(2)
+    assert tree.topLevelItem(0).text(0) == "Engine ECU"
+    dock._filter_edit.clear()
+    dock._group_combo.setCurrentIndex(0)
+    assert tree.topLevelItemCount() == 3
+
+
+@pytest.mark.parametrize("grouping", [0, 1, 2])
+def test_double_click_adds_signal_to_selected_graph(qtbot, grouping):
     window = MainWindow()
     qtbot.addWidget(window)
     window.show()
@@ -45,11 +84,15 @@ def test_double_click_adds_signal_to_selected_graph(qtbot):
     window._mdi_area.setActiveSubWindow(window._widget_to_subwin[selected_graph])
     assert window._channel_dock._graph is selected_graph
 
-    channel = ChannelInfo("VehicleSpeed", 1, 2, "km/h", "")
-    item = QListWidgetItem(channel.name)
-    item.setData(Qt.ItemDataRole.UserRole, channel)
-    window._signal_list_dock._current_file = "measurement.mf4"
-    window._signal_list_dock._list.addItem(item)
+    channel = ChannelInfo("VehicleSpeed", 1, 2, "km/h", "", "Motion", "ABS ECU")
+    dock = window._signal_list_dock
+    dock._current_file = "measurement.mf4"
+    dock._all_channels = [channel]
+    dock._group_combo.setCurrentIndex(grouping)
+    dock._apply_filter("")
+    item = dock._list.topLevelItem(0)
+    if grouping:
+        item = item.child(0)
 
     item_position = window._signal_list_dock._list.visualItemRect(item).center()
     qtbot.mouseClick(

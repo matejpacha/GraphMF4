@@ -25,6 +25,8 @@ class ChannelInfo:
     channel_index: int
     unit: str
     comment: str
+    message: str = ""
+    source: str = ""
 
 
 @dataclass
@@ -108,6 +110,9 @@ class MF4Reader:
         seen: set[tuple[str, int]] = set()
 
         for group_idx, group in enumerate(mdf.groups):
+            channel_group = group.channel_group
+            acquisition = getattr(channel_group, "acq_name", "") or ""
+            group_source = getattr(channel_group, "acq_source", None)
             for ch_idx, ch in enumerate(group.channels):
                 name = getattr(ch, "name", None)
                 if not name:
@@ -116,6 +121,19 @@ class MF4Reader:
                 if key in seen:
                     continue
                 seen.add(key)
+                # asammdf's CAN extraction stores explicit message aliases in MDF4.
+                # Do not infer a message or ECU from arbitrary dotted signal names.
+                message = ""
+                for alias, kind in (getattr(ch, "display_names", {}) or {}).items():
+                    if (
+                        kind == "message_name"
+                        or (kind == "display" and "message ID=" in acquisition)
+                    ) and alias.endswith(f".{name}"):
+                        message = alias[: -len(name) - 1]
+                        break
+                if "message ID=" in acquisition:
+                    message = f"{message} ({acquisition})" if message else acquisition
+                source = getattr(ch, "source", None) or group_source
                 channels.append(
                     ChannelInfo(
                         name=name,
@@ -123,6 +141,8 @@ class MF4Reader:
                         channel_index=ch_idx,
                         unit=getattr(ch, "unit", "") or "",
                         comment=getattr(ch, "comment", "") or "",
+                        message=message,
+                        source=getattr(source, "name", "") or "",
                     )
                 )
 

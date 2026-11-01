@@ -20,9 +20,9 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -65,12 +65,14 @@ def decode_channel_mime(mime_data) -> tuple[str, str, int, int] | None:
     return results[0] if results else None
 
 
-class _ChannelBrowserList(QListWidget):
-    """QListWidget that encodes channel info as MIME data when a drag starts."""
+class _ChannelBrowserList(QTreeWidget):
+    """Signal tree that retains the existing channel drag payload."""
 
     def __init__(self, dock: "SignalListDock") -> None:
         super().__init__()
         self._dock = dock
+        self.setHeaderHidden(True)
+        self.setRootIsDecorated(False)
         self.setDragEnabled(True)
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -83,7 +85,7 @@ class _ChannelBrowserList(QListWidget):
             return
         channels = []
         for item in selected_items:
-            ch: ChannelInfo | None = item.data(Qt.ItemDataRole.UserRole)
+            ch: ChannelInfo | None = item.data(0, Qt.ItemDataRole.UserRole)
             if ch is not None:
                 channels.append({
                     "file_path": self._dock._current_file,
@@ -136,6 +138,19 @@ class SignalListDock(QDockWidget):
         self._file_combo.setToolTip("Select the loaded MF4/MDF file to browse")
         self._file_combo.currentIndexChanged.connect(self._on_file_changed)
         layout.addWidget(self._file_combo)
+
+        self._group_combo = QComboBox()
+        self._group_combo.addItem("Seznam", "")
+        self._group_combo.addItem("Podle CAN zpráv", "message")
+        self._group_combo.addItem("Podle zdrojů / uzlů", "source")
+        self._group_combo.setToolTip(
+            "Skupiny používají metadata MF4. Zdroj nemusí označovat ECU; "
+            "bez metadat se signál zobrazí v Ostatní."
+        )
+        self._group_combo.currentIndexChanged.connect(
+            lambda: self._apply_filter(self._filter_edit.text())
+        )
+        layout.addWidget(self._group_combo)
 
         # ── text filter ───────────────────────────────────────────────
         self._filter_edit = QLineEdit()
@@ -222,22 +237,39 @@ class SignalListDock(QDockWidget):
     def _apply_filter(self, text: str) -> None:
         lo = text.strip().lower()
         self._list.clear()
+        grouping = self._group_combo.currentData()
+        self._list.setRootIsDecorated(bool(grouping))
+        groups: dict[str, QTreeWidgetItem] = {}
         for ch in self._all_channels:
             if lo and lo not in ch.name.lower():
                 continue
             label = ch.name
             if ch.unit:
                 label += f"  [{ch.unit}]"
-            item = QListWidgetItem(label)
+            item = QTreeWidgetItem([label])
             tip = f"Name: {ch.name}"
             if ch.unit:
                 tip += f"\nUnit: {ch.unit}"
             tip += f"\nGroup: {ch.group_index}  Index: {ch.channel_index}"
+            if ch.message:
+                tip += f"\nMessage: {ch.message}"
+            if ch.source:
+                tip += f"\nSource: {ch.source}"
             if ch.comment:
                 tip += f"\n{ch.comment}"
-            item.setToolTip(tip)
-            item.setData(Qt.ItemDataRole.UserRole, ch)
-            self._list.addItem(item)
+            item.setToolTip(0, tip)
+            item.setData(0, Qt.ItemDataRole.UserRole, ch)
+            if grouping:
+                name = getattr(ch, grouping) or "Ostatní"
+                if name not in groups:
+                    parent = QTreeWidgetItem([name])
+                    parent.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                    self._list.addTopLevelItem(parent)
+                    groups[name] = parent
+                groups[name].addChild(item)
+            else:
+                self._list.addTopLevelItem(item)
+        self._list.expandAll()
 
     # ──────────────────────────────────────────────────────────────────
     # Slots
@@ -246,8 +278,8 @@ class SignalListDock(QDockWidget):
     def _on_selection_changed(self) -> None:
         self._add_btn.setEnabled(bool(self._list.selectedItems()))
 
-    def _on_double_click(self, item: QListWidgetItem) -> None:
-        ch: ChannelInfo | None = item.data(Qt.ItemDataRole.UserRole)
+    def _on_double_click(self, item: QTreeWidgetItem, column: int) -> None:
+        ch: ChannelInfo | None = item.data(0, Qt.ItemDataRole.UserRole)
         if ch is not None and self._current_file:
             self.channel_requested.emit(self._current_file, ch)
 
@@ -255,6 +287,6 @@ class SignalListDock(QDockWidget):
         if not self._current_file:
             return
         for item in self._list.selectedItems():
-            ch: ChannelInfo | None = item.data(Qt.ItemDataRole.UserRole)
+            ch: ChannelInfo | None = item.data(0, Qt.ItemDataRole.UserRole)
             if ch is not None:
                 self.channel_requested.emit(self._current_file, ch)

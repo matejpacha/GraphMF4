@@ -46,6 +46,7 @@ from ui.graph_widget import GraphWidget
 from ui.replace_file_dialog import ReplaceFileDialog
 from ui.signal_list_dock import SignalListDock
 from ui.signal_selector_dialog import SignalSelectorDialog
+from version import __version__
 
 
 class MainWindow(QMainWindow):
@@ -1053,7 +1054,7 @@ class MainWindow(QMainWindow):
     def _update_title(self) -> None:
         name = self._project_path.stem if self._project_path else self._project.name
         dirty_marker = " *" if self._dirty else ""
-        self.setWindowTitle(f"GraphMF4 – {name}{dirty_marker}")
+        self.setWindowTitle(f"GraphMF4 v{__version__} – {name}{dirty_marker}")
 
     def _show_settings(self) -> None:
         from ui.settings_dialog import SettingsDialog

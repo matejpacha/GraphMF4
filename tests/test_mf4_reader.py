@@ -73,6 +73,39 @@ class TestMF4ReaderCaching:
 
 
 class TestMF4ReaderChannelList:
+    def test_message_and_source_metadata_roundtrip(self, tmp_path):
+        from asammdf import MDF, Signal
+        from asammdf.blocks.source_utils import Source
+
+        path = tmp_path / "metadata.mf4"
+        with MDF() as mdf:
+            mdf.append(
+                [Signal(
+                    samples=np.array([10.0, 20.0]),
+                    timestamps=np.array([0.0, 1.0]),
+                    name="Speed",
+                    display_names={"EngineStatus.Speed": "message_name"},
+                )],
+                acq_name="from CAN2 message ID=0x123",
+                acq_source=Source("Engine ECU", "CAN2", "", 2, 2),
+            )
+            mdf.append([Signal(
+                samples=np.array([1.0, 2.0]),
+                timestamps=np.array([0.0, 1.0]),
+                name="Unrelated.Dotted.Name",
+            )])
+            mdf.save(path, overwrite=True)
+
+        reader = MF4Reader()
+        try:
+            channels = {ch.name: ch for ch in reader.get_channel_list(path)}
+            assert channels["Speed"].message == "EngineStatus (from CAN2 message ID=0x123)"
+            assert channels["Speed"].source == "Engine ECU"
+            assert channels["Unrelated.Dotted.Name"].message == ""
+            assert channels["Unrelated.Dotted.Name"].source == ""
+        finally:
+            reader.close_all()
+
     def test_get_channel_list_returns_sine(self, tmp_path):
         path = _make_temp_mf4(tmp_path)
         reader = MF4Reader()
