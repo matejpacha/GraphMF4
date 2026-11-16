@@ -126,6 +126,7 @@ class MainWindow(QMainWindow):
         )
         file_menu.addSeparator()
         file_menu.addAction(self._action("Open Data &File\u2026", self._open_mf4_file, "Ctrl+F"))
+        file_menu.addAction(self._action("Import TXT → MF4…", self._import_txt))
         file_menu.addAction(self._action("Re&place Data File\u2026", self._replace_mf4_file))
         file_menu.addAction(self._action("&Reload All Data", self._reload_all_data, "F5"))
         file_menu.addSeparator()
@@ -547,6 +548,18 @@ class MainWindow(QMainWindow):
         lay.addLayout(btn_row)
 
         dlg.exec()
+
+    def _import_txt(self) -> None:
+        from ui.txt_import_dialog import TxtImportDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import TXT → MF4", filter="Text files (*.txt *.TXT *.csv *.CSV);;All Files (*)"
+        )
+        if not path:
+            return
+        dialog = TxtImportDialog(path, self._project.mf4_files, self)
+        if dialog.exec() and dialog.output_path:
+            self._load_mf4_async(dialog.output_path)
 
     def _load_mf4_async(self, path: str) -> None:
         """Open one MF4 file on a worker thread; show a progress dialog while waiting."""

@@ -151,6 +151,62 @@ def test_channel_context_menu_removes_selected_signals(qtbot, monkeypatch):
     window._dirty = False
 
 
+def test_txt_import_preview_updates_and_rejects_invalid_names(qtbot, tmp_path):
+    from ui.txt_import_dialog import TxtImportDialog
+
+    source = tmp_path / "table.txt"
+    source.write_text("ItemNote\tItemNote\n1,5\t2,5\n3,5\t4,5\n", encoding="utf-8")
+    dialog = TxtImportDialog(str(source), [])
+    qtbot.addWidget(dialog)
+    assert dialog._preview.rowCount() == 2
+    assert dialog._names == ["ItemNote", "ItemNote_2"]
+    dialog._period.setValue(0.25)
+    assert dialog._preview.item(1, 0).text() == "0.25"
+    dialog._has_time.setCurrentIndex(1)
+    dialog._time_column.setCurrentIndex(1)
+    assert dialog._preview.columnCount() == 2
+    assert not dialog._period.isEnabled()
+    dialog._name_edits[0].setText("Speed")
+    assert dialog._preview.horizontalHeaderItem(0).text() == "Speed"
+    dialog._name_edits[1].setText("Speed")
+    assert not dialog._save.isEnabled()
+    assert "jedinečné" in dialog._status.text()
+    dialog._name_edits[1].setText("Time")
+    assert dialog._save.isEnabled()
+    dialog._decimal.setCurrentIndex(1)
+    assert not dialog._save.isEnabled()
+    assert "neplatné číslo" in dialog._status.text()
+
+
+def test_txt_import_saves_and_loads_current_project(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QFileDialog
+
+    from ui.txt_import_dialog import TxtImportDialog
+
+    source = tmp_path / "table.txt"
+    source.write_text("A\tB\n1,5\t2,5\n3,5\t4,5\n", encoding="utf-8")
+    destination = tmp_path / "converted.mf4"
+    window = MainWindow()
+    qtbot.addWidget(window)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **kw: (str(source), ""))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **kw: (str(destination), ""))
+
+    def confirm_import():
+        dialog = window.findChild(TxtImportDialog)
+        dialog._import()
+
+    QTimer.singleShot(0, confirm_import)
+    window._import_txt()
+    try:
+        assert destination.is_file()
+        assert window._project.mf4_files == [str(destination)]
+        assert window._mf4_reader.read_signal(destination, "B").samples.tolist() == [2.5, 4.5]
+        assert window._signal_list_dock._list.topLevelItemCount() == 3
+    finally:
+        window._dirty = False
+
+
 def test_graph_window_move_snaps_to_neighbor(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
